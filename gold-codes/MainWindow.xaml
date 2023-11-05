@@ -3,10 +3,128 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
+        xmlns:cm="clr-namespace:System.ComponentModel;assembly=System"
         xmlns:local="clr-namespace:gold_codes"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
         
+        Title="Коды Голда" Height="450" Width="800"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        WindowState="Maximized" FontSize="12" FontFamily="Roboto"
+        Loaded="OnLoadedMainWindow">
+    <Grid Margin="5,0,5,0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="4*"/>
+            <ColumnDefinition Width="1.5*"/>
+        </Grid.ColumnDefinitions>
+        
+        <GroupBox Grid.Column="0" Header="Графики">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <WpfPlot Grid.Row="0" Name="ChartISignal" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="1" Name="ChartQSignal" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="2" Name="ChartResearchedSignal" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="3" Name="ChartCrossCorrelation" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="1" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
+            </Grid>
+        </GroupBox>
+        
+        <StackPanel Grid.Column="1">
+            <!-- #################################################################################### -->
+            <Expander Header="Параметры битовой последовательности">
+                <StackPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Длина последовательности, бит</Label>
+                        <xctk:IntegerUpDown Name="NudNb" TextAlignment="Right" Width="75" Height="25" Minimum="1" Maximum="128" Increment="1" Value="128" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Битрейт (bps), бит/с</Label>
+                        <xctk:IntegerUpDown Name="NudBps" TextAlignment="Right" Width="75" Height="25" Minimum="1" Maximum="10000" Increment="10" Value="500" />
+                    </WrapPanel>
+                    <Label>Битовая последовательность:</Label>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="8*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Name="TbBitsSequence" Grid.Column="0" HorizontalAlignment="Stretch" Height="43"
+                                 TextAlignment="Right" FontSize="18" FontWeight="Bold"
+                                 HorizontalScrollBarVisibility="Visible"
+                                 IsReadOnly="True" />
+                        <Button Grid.Column="1" HorizontalAlignment="Right"
+                                Content=" 0 " FontSize="20" FontWeight="Bold" ToolTip="Добавить '0'"
+                                Click="OnClickButtonAddZero" />
+                        <Button Grid.Column="2" HorizontalAlignment="Right"
+                                Content=" 1 " FontSize="20" FontWeight="Bold" ToolTip="Добавить '1'"
+                                Click="OnClickButtonAddOne" />
+                        <Button Grid.Column="3" HorizontalAlignment="Right"
+                                Content=" G " FontSize="20" FontWeight="Bold" ToolTip="Сгенерировать последовательность"
+                                Click="OnClickButtonGenerateBitsSequence" />
+                        <Button Grid.Column="4" HorizontalAlignment="Right"
+                                Content=" D " FontSize="20" FontWeight="Bold" ToolTip="Очистить поле"
+                                Click="OnClickButtonClearBits" />
+                    </Grid>
+                </StackPanel>
+            </Expander>
+            <!-- #################################################################################### -->
+            <Expander Header="Параметры несущей частоты">
+                <StackPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Амплитуда (А), у.е.</Label>
+                        <xctk:DoubleUpDown Name="NudA0" TextAlignment="Right" Width="75" Height="25" Minimum="1" Maximum="1000" Increment="1" FormatString="F1" Value="10" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Частота (f₀), Гц</Label>
+                        <xctk:DoubleUpDown Name="NudF0" TextAlignment="Right" Width="75" Height="25" Minimum="100" Maximum="1000000" Increment="50" Value="500" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Начальная фаза (φ₀), рад</Label>
+                        <xctk:DoubleUpDown Name="NudPhi0" TextAlignment="Right" Width="75" Height="25" Minimum="0" Maximum="10" Increment="1" FormatString="F2" Value="0" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Частота дискретизации</Label>
+                        <xctk:DoubleUpDown Name="NudFd" TextAlignment="Right" Width="75" Height="25" Minimum="1000" Maximum="10000000" Increment="1000" Value="10000" />
+                    </WrapPanel>
+                    <CheckBox Name="CbIsNoise" HorizontalAlignment="Right" Margin="0 5 0 0"
+                              Click="OnCheckedCheckBoxIsNoise">
+                        Наложить шум?
+                    </CheckBox>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>ОСШ, дБ</Label>
+                        <xctk:DoubleUpDown Name="NudSnr" TextAlignment="Right"
+                                           Width="75" Height="25" IsEnabled="False"
+                                           Minimum="-100" Maximum="100" Increment="1" Value="0" />
+                    </WrapPanel>
+                </StackPanel>
+            </Expander>
+            <!-- #################################################################################### -->
+            <Button Name="ButtonGenerateSignal"
+                    Height="25" Margin="0 5 0 0"
+                    Click="OnGenerateSignal">
+                Сгенерировать
+            </Button>
+        </StackPanel>
     </Grid>
+    
+    <Window.Resources>
+        <cm:BackgroundWorker x:Key="BackgroundWorkerGenerateSignal"
+                             DoWork="OnDoWorkBackgroundWorkerGenerateSignal"
+                             RunWorkerCompleted="OnRunWorkerCompletedBackgroundWorkerGenerateSignal" 
+                             />
+        <cm:BackgroundWorker x:Key="BackgroundWorkerConductResearch"
+                             WorkerReportsProgress="True"
+                             DoWork="OnDoWorkBackgroundWorkerConductResearch"
+                             RunWorkerCompleted="OnRunWorkerCompletedBackgroundWorkerConductResearch"
+                             ProgressChanged="OnProgressChangedBackgroundWorkerConductResearch" />
+    </Window.Resources>
 </Window>
