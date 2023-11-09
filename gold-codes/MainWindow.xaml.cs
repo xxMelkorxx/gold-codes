@@ -31,9 +31,9 @@ namespace gold_codes
         private void OnLoadedMainWindow(object sender, RoutedEventArgs e)
         {
             // Настройка графиков.
-            SetUpChart(ChartISignal, "I-компонента сигнала", "Время, с", "Амплитуда");
-            SetUpChart(ChartQSignal, "Q-компонента сигнала", "Время, с", "Амплитуда");
-            // SetUpChart(ChartResearchedSignal, "Исследуемый сигнал", "Время, с", "Амплитуда");
+            SetUpChart(ChartIComponent, "I-компонента сигнала", "Время, с", "Амплитуда");
+            SetUpChart(ChartQComponent, "Q-компонента сигнала", "Время, с", "Амплитуда");
+            SetUpChart(ChartComplexEnvelope, "Комплексная огибающая", "Время, с", "Амплитуда");
             // SetUpChart(ChartCrossCorrelation, "Взаимная корреляция сигналов", "Время, с", "Амплитуда");
             // SetUpChart(ChartResearch, "Зависимость вероятности обнаружения сигнала от ОСШ", "Уровень шума, дБ", "Вероятность обнаружения");
 
@@ -55,16 +55,13 @@ namespace gold_codes
                 ["f0"] = NudF0.Value ?? 1000,
                 ["phi0"] = NudPhi0.Value ?? 0,
                 ["fd"] = NudFd.Value ?? 1,
-                // ["startBit"] = NudStartBit.Value ?? 100,
-                // ["countBits"] = NudCountBits.Value ?? 200,
-                // ["modulationType"] = _modulationType,
                 ["isNoise"] = CbIsNoise.IsChecked ?? false,
                 ["SNR"] = NudSnr.Value ?? 5
             };
 
             // Получение битовой последовательности.
-            var bitsSequence = new List<bool>();
-            TbBitsSequence.Text.Replace(" ", "").ToList().ForEach(b => bitsSequence.Add(b == '1'));
+            var bitsSequence = new List<int>();
+            TbBitsSequence.Text.Replace(" ", "").ToList().ForEach(b => bitsSequence.Add(b == '1' ? 1 : 0));
             _params1["bitsSequence"] = bitsSequence;
 
             ButtonGenerateSignal.IsEnabled = false;
@@ -75,7 +72,12 @@ namespace gold_codes
         {
             try
             {
+                _signalGenerator = new SignalGenerator(_params1);
+                _signalGenerator.CalculatedIQComponents();
                 
+                // Наложение шума.
+                if ((bool)_params1["isNoise"])
+                    _signalGenerator.MakeNoise((double)_params1["SNR"]);
             }
             catch (Exception exception)
             {
@@ -83,7 +85,54 @@ namespace gold_codes
             }
         }
 
-        private void OnRunWorkerCompletedBackgroundWorkerGenerateSignal(object sender, RunWorkerCompletedEventArgs e) { ButtonGenerateSignal.IsEnabled = true; }
+        private void OnRunWorkerCompletedBackgroundWorkerGenerateSignal(object sender, RunWorkerCompletedEventArgs e)
+        {
+            ButtonGenerateSignal.IsEnabled = true;
+            
+            // Очистка графиков.
+            ChartIComponent.Plot.Clear();
+            ChartQComponent.Plot.Clear();
+            ChartComplexEnvelope.Plot.Clear();
+            ChartCrossCorrelation.Plot.Clear();
+            
+            // График I-компоненты.
+            ChartIComponent.Plot.AddSignalXY(
+                xs:_signalGenerator.IComponent.Select(p => p.X).ToArray(),
+                ys:_signalGenerator.IComponent.Select(p => p.Y).ToArray(),
+                color:Color.Blue,
+                label:"I-компонента"
+            );
+            ChartIComponent.Plot.Legend();
+            ChartIComponent.Plot.SetAxisLimits(xMin: 0, xMax: _signalGenerator.IComponent.Max(p => p.X), yMin: -1, yMax: 1);
+            ChartIComponent.Refresh();
+            
+            // График Q-компоненты.
+            ChartQComponent.Plot.AddSignalXY(
+                xs:_signalGenerator.QComponent.Select(p => p.X).ToArray(),
+                ys:_signalGenerator.QComponent.Select(p => p.Y).ToArray(),
+                color: Color.Red,
+                label: "Q-компонента"
+            );
+            ChartQComponent.Plot.Legend();
+            ChartQComponent.Plot.SetAxisLimits(xMin: 0, xMax: _signalGenerator.QComponent.Max(p => p.X), yMin: -1, yMax: 1);
+            ChartQComponent.Refresh();
+            
+            // График Q-компоненты.
+            var yMax = 1.5 * _signalGenerator.ComplexEnvelope.Max(p => p.Y);
+            ChartComplexEnvelope.Plot.AddSignalXY(
+                xs:_signalGenerator.ComplexEnvelope.Select(p => p.X).ToArray(),
+                ys:_signalGenerator.ComplexEnvelope.Select(p => p.Y).ToArray(),
+                color: Color.Green,
+                label: "Q-компонента"
+            );
+            ChartComplexEnvelope.Plot.Legend();
+            ChartComplexEnvelope.Plot.SetAxisLimits(
+                xMin: 0,
+                xMax: _signalGenerator.ComplexEnvelope.Max(p => p.X),
+                yMin: -yMax,
+                yMax: yMax);
+            ChartComplexEnvelope.Refresh();
+        }
 
         #endregion
 

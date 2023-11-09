@@ -27,9 +27,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <WpfPlot Grid.Row="0" Name="ChartISignal" FontFamily="JetBrains Mono" />
-                <WpfPlot Grid.Row="1" Name="ChartQSignal" FontFamily="JetBrains Mono" />
-                <WpfPlot Grid.Row="2" Name="ChartResearchedSignal" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="0" Name="ChartIComponent" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="1" Name="ChartQComponent" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="2" Name="ChartComplexEnvelope" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="3" Name="ChartCrossCorrelation" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="1" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
             </Grid>
@@ -37,11 +37,11 @@
         
         <StackPanel Grid.Column="1">
             <!-- #################################################################################### -->
-            <Expander Header="Параметры битовой последовательности">
+            <Expander Header="Параметры битовой последовательности" IsExpanded="True">
                 <StackPanel>
                     <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
                         <Label>Длина последовательности, бит</Label>
-                        <xctk:IntegerUpDown Name="NudNb" TextAlignment="Right" Width="75" Height="25" Minimum="1" Maximum="128" Increment="1" Value="128" />
+                        <xctk:IntegerUpDown Name="NudNb" TextAlignment="Right" Width="75" Height="25" Minimum="2" Maximum="128" Increment="1" Value="8" />
                     </WrapPanel>
                     <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
                         <Label>Битрейт (bps), бит/с</Label>
@@ -77,7 +77,7 @@
                 </StackPanel>
             </Expander>
             <!-- #################################################################################### -->
-            <Expander Header="Параметры несущей частоты">
+            <Expander Header="Параметры несущей частоты" IsExpanded="True">
                 <StackPanel>
                     <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
                         <Label>Амплитуда (А), у.е.</Label>
