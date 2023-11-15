@@ -18,7 +18,7 @@ namespace gold_codes
         private readonly BackgroundWorker _bgGenerateSignal, _bgResearch;
         private SignalGenerator _signalGenerator;
         private Dictionary<string, object> _params1;
-        private int _maxIndex;
+        private Dictionary<string, int> _maxIndexes;
 
         public MainWindow()
         {
@@ -34,7 +34,7 @@ namespace gold_codes
             SetUpChart(ChartIComponent, "I-компонента сигнала", "Время, с", "Амплитуда");
             SetUpChart(ChartQComponent, "Q-компонента сигнала", "Время, с", "Амплитуда");
             SetUpChart(ChartComplexEnvelope, "Комплексная огибающая", "Время, с", "Амплитуда");
-            // SetUpChart(ChartCrossCorrelation, "Взаимная корреляция сигналов", "Время, с", "Амплитуда");
+            SetUpChart(ChartConvolutions, "Свёртки согласованнных фильтров", "Время, с", "Амплитуда");
             // SetUpChart(ChartResearch, "Зависимость вероятности обнаружения сигнала от ОСШ", "Уровень шума, дБ", "Вероятность обнаружения");
 
             OnClickButtonGenerateBitsSequence(null, null);
@@ -74,7 +74,8 @@ namespace gold_codes
             {
                 _signalGenerator = new SignalGenerator(_params1);
                 _signalGenerator.CalculatedIQComponents();
-                
+                _signalGenerator.CalculatedConvolution(out _maxIndexes);
+
                 // Наложение шума.
                 if ((bool)_params1["isNoise"])
                     _signalGenerator.MakeNoise((double)_params1["SNR"]);
@@ -88,50 +89,64 @@ namespace gold_codes
         private void OnRunWorkerCompletedBackgroundWorkerGenerateSignal(object sender, RunWorkerCompletedEventArgs e)
         {
             ButtonGenerateSignal.IsEnabled = true;
-            
+
             // Очистка графиков.
             ChartIComponent.Plot.Clear();
             ChartQComponent.Plot.Clear();
             ChartComplexEnvelope.Plot.Clear();
-            ChartCrossCorrelation.Plot.Clear();
-            
+            ChartConvolutions.Plot.Clear();
+
             // График I-компоненты.
             ChartIComponent.Plot.AddSignalXY(
-                xs:_signalGenerator.IComponent.Select(p => p.X).ToArray(),
-                ys:_signalGenerator.IComponent.Select(p => p.Y).ToArray(),
-                color:Color.Blue,
-                label:"I-компонента"
+                xs: _signalGenerator.IComponent.Select(p => p.X).ToArray(),
+                ys: _signalGenerator.IComponent.Select(p => p.Y).ToArray(),
+                color: Color.Blue,
+                label: "I-компонента"
             );
             ChartIComponent.Plot.Legend();
             ChartIComponent.Plot.SetAxisLimits(xMin: 0, xMax: _signalGenerator.IComponent.Max(p => p.X), yMin: -1, yMax: 1);
             ChartIComponent.Refresh();
-            
+
             // График Q-компоненты.
             ChartQComponent.Plot.AddSignalXY(
-                xs:_signalGenerator.QComponent.Select(p => p.X).ToArray(),
-                ys:_signalGenerator.QComponent.Select(p => p.Y).ToArray(),
+                xs: _signalGenerator.QComponent.Select(p => p.X).ToArray(),
+                ys: _signalGenerator.QComponent.Select(p => p.Y).ToArray(),
                 color: Color.Red,
                 label: "Q-компонента"
             );
             ChartQComponent.Plot.Legend();
             ChartQComponent.Plot.SetAxisLimits(xMin: 0, xMax: _signalGenerator.QComponent.Max(p => p.X), yMin: -1, yMax: 1);
             ChartQComponent.Refresh();
-            
-            // График Q-компоненты.
+
+            // График комплексной огибающей.
             var yMax = 1.5 * _signalGenerator.ComplexEnvelope.Max(p => p.Y);
             ChartComplexEnvelope.Plot.AddSignalXY(
-                xs:_signalGenerator.ComplexEnvelope.Select(p => p.X).ToArray(),
-                ys:_signalGenerator.ComplexEnvelope.Select(p => p.Y).ToArray(),
+                xs: _signalGenerator.ComplexEnvelope.Select(p => p.X).ToArray(),
+                ys: _signalGenerator.ComplexEnvelope.Select(p => p.Y).ToArray(),
                 color: Color.Green,
-                label: "Q-компонента"
+                label: "Комплексная огибающая"
             );
             ChartComplexEnvelope.Plot.Legend();
-            ChartComplexEnvelope.Plot.SetAxisLimits(
-                xMin: 0,
-                xMax: _signalGenerator.ComplexEnvelope.Max(p => p.X),
-                yMin: -yMax,
-                yMax: yMax);
+            ChartComplexEnvelope.Plot.SetAxisLimits(xMin: 0, xMax: _signalGenerator.ComplexEnvelope.Max(p => p.X), yMin: -yMax, yMax: yMax);
             ChartComplexEnvelope.Refresh();
+
+            // Графики свёрток согласованных фильтров.
+            var maxValues = new List<double>();
+            foreach (var pair in _signalGenerator.Convolutions)
+            {
+                ChartConvolutions.Plot.AddSignalXY(
+                    pair.Value.Select(p => p.X).ToArray(),
+                    pair.Value.Select(p => p.Y).ToArray(),
+                    label: pair.Key
+                );
+                maxValues.Add(pair.Value[_maxIndexes[pair.Key]].Y);
+                // ChartConvolutions.Plot.AddVerticalLine(_maxIndexes[pair.Key] * _signalGenerator.dt);
+            }
+
+            yMax = maxValues.Max() * 1.5;
+            ChartConvolutions.Plot.SetAxisLimits(yMin: -yMax, yMax: yMax);
+            ChartConvolutions.Plot.Legend();
+            ChartConvolutions.Refresh();
         }
 
         #endregion

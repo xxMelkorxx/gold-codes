@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
+using System.Linq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace gold_codes;
 
@@ -71,7 +73,15 @@ public class SignalGenerator
     /// </summary>
     public List<PointD> QComponent;
 
+    /// <summary>
+    /// Комплексная огибающая.
+    /// </summary>
     public List<PointD> ComplexEnvelope;
+
+    /// <summary>
+    /// Свёртки согласованных фильтров.
+    /// </summary>
+    public Dictionary<string, List<PointD>> Convolutions;
 
     private const double pi2 = 2 * Math.PI;
 
@@ -90,6 +100,7 @@ public class SignalGenerator
         IComponent = new List<PointD>();
         QComponent = new List<PointD>();
         ComplexEnvelope = new List<PointD>();
+        Convolutions = new Dictionary<string, List<PointD>>();
     }
 
     /// <summary>
@@ -171,17 +182,98 @@ public class SignalGenerator
     {
         var idx = 0;
         for (var i = 0; i < (Nb % 2 == 0 ? Nb : Nb - 1); i += 2)
-        for (var n = 0; n < 2 * (tb / dt); n++)
         {
-            var ti = idx * dt;
             var bi1 = bitsSequence[i] - 0.5;
             var bi2 = bitsSequence[i + 1] - 0.5;
-            IComponent.Add(new PointD(ti, bi1));
-            QComponent.Add(new PointD(ti, bi2));
-            ComplexEnvelope.Add(new PointD(ti, bi1 * Math.Cos(pi2 * f0 * ti) - bi2 * Math.Sin(pi2 * f0 * ti)));
-            idx++;
+            for (var n = 0; n < 2 * (tb / dt); n++)
+            {
+                var ti = idx++ * dt;
+                IComponent.Add(new PointD(ti, bi1));
+                QComponent.Add(new PointD(ti, bi2));
+                ComplexEnvelope.Add(new PointD(ti, bi1 * Math.Cos(pi2 * f0 * ti) - bi2 * Math.Sin(pi2 * f0 * ti + phi0)));
+            }
         }
     }
+
+    /// <summary>
+    /// Получение свёрток 
+    /// </summary>
+    /// <param name="maxIndexes"></param>
+    public void CalculatedConvolution(out Dictionary<string, int> maxIndexes)
+    {
+        var indexes = new Dictionary<string, int>();
+        var idx = 0;
+        Parallel.ForEach(_goldSequences, pair =>
+        {
+            var filter = new List<PointD>();
+            for (var i = 0; i < pair.Value.Length - 1; i++)
+            {
+                var ti = idx * dt;
+                var b1 = pair.Value[i] - 0.5;
+                var b2 = pair.Value[i + 1] - 0.5;
+                for (var j = 0; j < tb / dt; j++)
+                    filter.Add(new PointD(ti, b1 * Math.Cos(pi2 * f0 * ti + phi0) - b2 * Math.Sin(pi2 * f0 * ti + phi0)));
+                idx++;
+            }
+
+            Convolutions[pair.Key] = GetCrossCorrelation(filter, out var maxIndex);
+            indexes[pair.Key] = maxIndex;
+        });
+        maxIndexes = indexes;
+    }
+
+    /// <summary>
+    /// Взаимная корреляция комплексной огибающей с фильтром.
+    /// </summary>
+    /// <param name="filter"></param>
+    /// <param name="maxIndex">Индекс максимального значения</param>
+    /// <returns></returns>
+    private List<PointD> GetCrossCorrelation(List<PointD> filter, out int maxIndex)
+    {
+        var crossCorrelation = new List<PointD>();
+        var maxCorr = double.MinValue;
+        var index = 0;
+        for (var i = 0; i < ComplexEnvelope.Count - filter.Count + 1; i++)
+        {
+            var corr = 0d;
+            for (var j = 0; j < filter.Count; j++)
+                corr += ComplexEnvelope[i + j].Y * filter[j].Y;
+            crossCorrelation.Add(new PointD(ComplexEnvelope[i].X, corr / filter.Count));
+
+            if (crossCorrelation[i].Y > maxCorr)
+            {
+                maxCorr = crossCorrelation[i].Y;
+                index = i;
+            }
+        }
+
+        maxIndex = index;
+        return crossCorrelation;
+    }
+
+    // public List<string> DecodeSignal()
+    // {
+    //     var lengthConvolution = Convolutions["00"].Count;
+    //     var countBitsFilter = Nb / 2 - 1;
+    //     var interval = (int)(tb / dt * 62);
+    //     var startEnd = (lengthConvolution - interval * (countBitsFilter - 1) - 1) / 2;
+    //
+    //     var result = new List<string>();
+    //     for (var i = 0; i < lengthConvolution - 1;)
+    //     {
+    //         var range = i == 0 || i == lengthConvolution - startEnd - 1 ? startEnd : interval;
+    //
+    //         var max = new Dictionary<string, double>();
+    //         foreach (var pair in Convolutions)
+    //             max[pair.Key] = pair.Value.GetRange(i, range).Select(p => p.Y).Max();
+    //
+    //         result.Add(max.);
+    //         result.Add(max.MaxBy(pair => pair.Value).Key);
+    //         i += i == 0 || i == lengthConvolution - startEnd - 1 ? startEnd : interval;
+    //     }
+    //
+    //     return result;
+    // }
 
     /// <summary>
     /// Генерация случайного числа с нормальным распределением.
@@ -218,7 +310,6 @@ public class SignalGenerator
 
         return noise.Select(y => y * norm).ToList();
     }
-
 
     /// <summary>
     /// Наложить шум на сигнал.

@@ -30,7 +30,7 @@
                 <WpfPlot Grid.Row="0" Name="ChartIComponent" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="1" Name="ChartQComponent" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="2" Name="ChartComplexEnvelope" FontFamily="JetBrains Mono" />
-                <WpfPlot Grid.Row="3" Name="ChartCrossCorrelation" FontFamily="JetBrains Mono" />
+                <WpfPlot Grid.Row="3" Name="ChartConvolutions" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="1" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
             </Grid>
         </GroupBox>
