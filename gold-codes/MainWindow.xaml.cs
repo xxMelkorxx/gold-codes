@@ -17,7 +17,7 @@ namespace gold_codes
     {
         private readonly BackgroundWorker _bgGenerateSignal, _bgResearch;
         private SignalGenerator _signalGenerator;
-        private Dictionary<string, object> _params1;
+        private Dictionary<string, object> _params1, _params2;
         private Dictionary<string, int> _maxIndexes;
 
         public MainWindow()
@@ -74,11 +74,11 @@ namespace gold_codes
             {
                 _signalGenerator = new SignalGenerator(_params1);
                 _signalGenerator.CalculatedIQComponents();
-                _signalGenerator.CalculatedConvolution(out _maxIndexes);
-
                 // Наложение шума.
                 if ((bool)_params1["isNoise"])
                     _signalGenerator.MakeNoise((double)_params1["SNR"]);
+                _signalGenerator.CalculatedConvolution(out _maxIndexes);
+
             }
             catch (Exception exception)
             {
@@ -90,6 +90,15 @@ namespace gold_codes
         {
             ButtonGenerateSignal.IsEnabled = true;
 
+            // Получение декодированной последовательности.
+            TbRestoredBitsSequence.Text = string.Join("", _signalGenerator.DecodeSignal());
+            
+            ChartIComponent.Visibility = Visibility.Visible;
+            ChartQComponent.Visibility = Visibility.Visible;
+            ChartComplexEnvelope.Visibility = Visibility.Visible;
+            ChartConvolutions.Visibility = Visibility.Visible;
+            ChartResearch.Visibility = Visibility.Collapsed;
+            
             // Очистка графиков.
             ChartIComponent.Plot.Clear();
             ChartQComponent.Plot.Clear();
@@ -140,7 +149,6 @@ namespace gold_codes
                     label: pair.Key
                 );
                 maxValues.Add(pair.Value[_maxIndexes[pair.Key]].Y);
-                // ChartConvolutions.Plot.AddVerticalLine(_maxIndexes[pair.Key] * _signalGenerator.dt);
             }
 
             yMax = maxValues.Max() * 1.5;
@@ -153,12 +161,39 @@ namespace gold_codes
 
         #region ################# CONDUCT RESEARCH #################
 
-        private void OnClickButtonConductResearch(object sender, RoutedEventArgs e) { }
+        private void OnClickButtonConductResearch(object sender, RoutedEventArgs e)
+        {
+            ButtonConductResearch.Visibility = Visibility.Collapsed;
+            ProgressResearch.Visibility = Visibility.Visible;
+            
+            _params2 = new Dictionary<string, object>
+            {
+                ["bps"] = NudBps.Value ?? 10,
+                ["a0"] = NudA0.Value ?? 1,
+                ["f0"] = NudF0.Value ?? 1000,
+                ["phi0"] = NudPhi0.Value ?? 0,
+                ["fd"] = NudFd.Value ?? 1,
+                ["meanOrder"] = NudMeanOrder.Value ?? 50,
+                ["snrFrom"] = NudSnrFrom.Value ?? -20,
+                ["snrTo"] = NudSnrTo.Value ?? 10,
+                ["snrStep"] = NudSnrStep.Value ?? 0.5,
+            };
+            
+            // Получение битовой последовательности.
+            var bitsSequence = new List<int>();
+            TbBitsSequence.Text.Replace(" ", "").ToList().ForEach(b => bitsSequence.Add(b == '1' ? 1 : 0));
+            _params1["bitsSequence"] = bitsSequence;
+            
+            ProgressResearch.Value = 0;
+            
+            _bgResearch.RunWorkerAsync();
+        }
 
         private void OnDoWorkBackgroundWorkerConductResearch(object sender, DoWorkEventArgs e)
         {
             try
             {
+                
             }
             catch (Exception exception)
             {
@@ -168,7 +203,20 @@ namespace gold_codes
 
         private void OnRunWorkerCompletedBackgroundWorkerConductResearch(object sender, RunWorkerCompletedEventArgs e) { }
 
-        private void OnProgressChangedBackgroundWorkerConductResearch(object sender, ProgressChangedEventArgs e) { }
+        private void OnProgressChangedBackgroundWorkerConductResearch(object sender, ProgressChangedEventArgs e)
+        {
+            ChartIComponent.Visibility = Visibility.Collapsed;
+            ChartQComponent.Visibility = Visibility.Collapsed;
+            ChartComplexEnvelope.Visibility = Visibility.Collapsed;
+            ChartConvolutions.Visibility = Visibility.Collapsed;
+            ChartResearch.Visibility = Visibility.Visible;
+            
+            // Отрисовка графика ... . 
+            ChartResearch.Plot.Clear();
+            
+            ButtonConductResearch.Visibility = Visibility.Visible;
+            ProgressResearch.Visibility = Visibility.Collapsed;
+        }
 
         #endregion
 
@@ -176,14 +224,12 @@ namespace gold_codes
 
         private void OnClickButtonAddZero(object sender, RoutedEventArgs e)
         {
-            TbBitsSequence.Text += TbBitsSequence.Text.Length % 5 == 0 ? " " : "";
             TbBitsSequence.Text += '0';
             ButtonGenerateSignal.IsEnabled = true;
         }
 
         private void OnClickButtonAddOne(object sender, RoutedEventArgs e)
         {
-            TbBitsSequence.Text += TbBitsSequence.Text.Length % 5 == 0 ? " " : "";
             TbBitsSequence.Text += '1';
             ButtonGenerateSignal.IsEnabled = true;
         }
@@ -201,10 +247,7 @@ namespace gold_codes
 
             TbBitsSequence.Clear();
             for (var i = 0; i < bits.Length; i++)
-            {
-                TbBitsSequence.Text += i % 4 == 0 ? " " : "";
                 TbBitsSequence.Text += bits[i];
-            }
 
             ButtonGenerateSignal.IsEnabled = true;
             OnGenerateSignal(null, null);

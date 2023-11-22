@@ -7,17 +7,17 @@
         xmlns:cm="clr-namespace:System.ComponentModel;assembly=System"
         xmlns:local="clr-namespace:gold_codes"
         mc:Ignorable="d"
-        
+
         Title="Коды Голда" Height="450" Width="800"
         RenderOptions.BitmapScalingMode="HighQuality"
         WindowState="Maximized" FontSize="12" FontFamily="Roboto"
         Loaded="OnLoadedMainWindow">
     <Grid Margin="5,0,5,0">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="4*"/>
-            <ColumnDefinition Width="1.5*"/>
+            <ColumnDefinition Width="4*" />
+            <ColumnDefinition Width="1.5*" />
         </Grid.ColumnDefinitions>
-        
+
         <GroupBox Grid.Column="0" Header="Графики">
             <Grid>
                 <Grid.RowDefinitions>
@@ -31,10 +31,10 @@
                 <WpfPlot Grid.Row="1" Name="ChartQComponent" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="2" Name="ChartComplexEnvelope" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="3" Name="ChartConvolutions" FontFamily="JetBrains Mono" />
-                <WpfPlot Grid.Row="1" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
+                <WpfPlot Grid.Row="0" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
             </Grid>
         </GroupBox>
-        
+
         <StackPanel Grid.Column="1">
             <!-- #################################################################################### -->
             <Expander Header="Параметры битовой последовательности" IsExpanded="True">
@@ -58,9 +58,8 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBox Name="TbBitsSequence" Grid.Column="0" HorizontalAlignment="Stretch" Height="43"
-                                 TextAlignment="Right" FontSize="18" FontWeight="Bold"
-                                 HorizontalScrollBarVisibility="Visible"
-                                 IsReadOnly="True" />
+                                 TextAlignment="Left" FontSize="18" FontWeight="Bold"
+                                 HorizontalScrollBarVisibility="Visible" IsReadOnly="True" />
                         <Button Grid.Column="1" HorizontalAlignment="Right"
                                 Content=" 0 " FontSize="20" FontWeight="Bold" ToolTip="Добавить '0'"
                                 Click="OnClickButtonAddZero" />
@@ -74,6 +73,10 @@
                                 Content=" D " FontSize="20" FontWeight="Bold" ToolTip="Очистить поле"
                                 Click="OnClickButtonClearBits" />
                     </Grid>
+                    <Label>Восстановленная последовательность:</Label>
+                    <TextBox Name="TbRestoredBitsSequence" Height="43"
+                             TextAlignment="Left" FontSize="18" FontWeight="Bold"
+                             HorizontalScrollBarVisibility="Visible" IsReadOnly="True" />
                 </StackPanel>
             </Expander>
             <!-- #################################################################################### -->
@@ -113,14 +116,36 @@
                     Click="OnGenerateSignal">
                 Сгенерировать
             </Button>
+            <!-- #################################################################################### -->
+            <Expander Header="Исследование" Name="GbResearch" IsExpanded="True">
+                <StackPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Число усреднений</Label>
+                        <xctk:IntegerUpDown Name="NudMeanOrder" TextAlignment="Right" Width="75" Height="25" Minimum="1" Maximum="1000" Increment="10" Value="50" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Диапазон шума, дБ</Label>
+                        <xctk:IntegerUpDown Name="NudSnrFrom" TextAlignment="Right" Width="45" Height="25" Minimum="-50" Maximum="0" Increment="1" Value="-20" />
+                        <Label>:</Label>
+                        <xctk:IntegerUpDown Name="NudSnrTo" TextAlignment="Right" Width="45" Height="25" Minimum="1" Maximum="50" Increment="1" Value="10" />
+                    </WrapPanel>
+                    <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
+                        <Label>Шаг изменения шума, дБ</Label>
+                        <xctk:DoubleUpDown Name="NudSnrStep" TextAlignment="Right" Width="75" Height="25" Minimum="0.1" Maximum="2.0" Increment="0.1" Value="0.5" FormatString="F1" />
+                    </WrapPanel>
+                    <Button Name="ButtonConductResearch" Height="25" Margin="0 5 0 0" Click="OnClickButtonConductResearch">Исследовать</Button>
+                    <ProgressBar Name="ProgressResearch"
+                                 Margin="0 5 0 0" Height="25" Visibility="Collapsed"
+                                 Maximum="1000" />
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </Grid>
-    
+
     <Window.Resources>
         <cm:BackgroundWorker x:Key="BackgroundWorkerGenerateSignal"
                              DoWork="OnDoWorkBackgroundWorkerGenerateSignal"
-                             RunWorkerCompleted="OnRunWorkerCompletedBackgroundWorkerGenerateSignal" 
-                             />
+                             RunWorkerCompleted="OnRunWorkerCompletedBackgroundWorkerGenerateSignal" />
         <cm:BackgroundWorker x:Key="BackgroundWorkerConductResearch"
                              WorkerReportsProgress="True"
                              DoWork="OnDoWorkBackgroundWorkerConductResearch"

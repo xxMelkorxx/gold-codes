@@ -203,22 +203,23 @@ public class SignalGenerator
     {
         var indexes = new Dictionary<string, int>();
         var idx = 0;
-        Parallel.ForEach(_goldSequences, pair =>
+        foreach (var pair in _goldSequences)
         {
             var filter = new List<PointD>();
             for (var i = 0; i < pair.Value.Length - 1; i++)
             {
-                var ti = idx * dt;
                 var b1 = pair.Value[i] - 0.5;
                 var b2 = pair.Value[i + 1] - 0.5;
                 for (var j = 0; j < tb / dt; j++)
-                    filter.Add(new PointD(ti, b1 * Math.Cos(pi2 * f0 * ti + phi0) - b2 * Math.Sin(pi2 * f0 * ti + phi0)));
-                idx++;
+                {
+                    var ti = idx++ * dt;
+                    var temp = b1 * Math.Cos(pi2 * f0 * ti + phi0) - b2 * Math.Sin(pi2 * f0 * ti + phi0);
+                    filter.Add(new PointD(ti, temp));
+                }
             }
-
             Convolutions[pair.Key] = GetCrossCorrelation(filter, out var maxIndex);
             indexes[pair.Key] = maxIndex;
-        });
+        }
         maxIndexes = indexes;
     }
 
@@ -251,29 +252,35 @@ public class SignalGenerator
         return crossCorrelation;
     }
 
-    // public List<string> DecodeSignal()
-    // {
-    //     var lengthConvolution = Convolutions["00"].Count;
-    //     var countBitsFilter = Nb / 2 - 1;
-    //     var interval = (int)(tb / dt * 62);
-    //     var startEnd = (lengthConvolution - interval * (countBitsFilter - 1) - 1) / 2;
-    //
-    //     var result = new List<string>();
-    //     for (var i = 0; i < lengthConvolution - 1;)
-    //     {
-    //         var range = i == 0 || i == lengthConvolution - startEnd - 1 ? startEnd : interval;
-    //
-    //         var max = new Dictionary<string, double>();
-    //         foreach (var pair in Convolutions)
-    //             max[pair.Key] = pair.Value.GetRange(i, range).Select(p => p.Y).Max();
-    //
-    //         result.Add(max.);
-    //         result.Add(max.MaxBy(pair => pair.Value).Key);
-    //         i += i == 0 || i == lengthConvolution - startEnd - 1 ? startEnd : interval;
-    //     }
-    //
-    //     return result;
-    // }
+    public List<string> DecodeSignal()
+    {
+        var lengthConvolution = Convolutions["00"].Count;
+        var countBitsFilter = Nb / 63 - 1;
+        var interval = (int)(tb / dt * 62);
+        var startEnd = (lengthConvolution - interval * (countBitsFilter - 1) - 1) / 2;
+    
+        var result = new List<string>();
+        for (var i = 0; i < lengthConvolution - 1;)
+        {
+            var range = (i == 0 || i == lengthConvolution - startEnd - 1) ? startEnd : interval;
+    
+            var maxValue = double.MinValue;
+            var maxKey = string.Empty;
+            foreach (var pair in Convolutions)
+            {
+                var temp = pair.Value.GetRange(i, range).Select(p => p.Y).Max();
+                if (maxValue < temp)
+                {
+                    maxValue = temp;
+                    maxKey = pair.Key;
+                }
+            }
+            result.Add(maxKey);
+            i += (i == 0 || i == lengthConvolution - startEnd - 1) ? startEnd : interval;
+        }
+    
+        return result;
+    }
 
     /// <summary>
     /// Генерация случайного числа с нормальным распределением.
