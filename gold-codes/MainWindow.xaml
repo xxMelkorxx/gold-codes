@@ -31,7 +31,7 @@
                 <WpfPlot Grid.Row="1" Name="ChartQComponent" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="2" Name="ChartComplexEnvelope" FontFamily="JetBrains Mono" />
                 <WpfPlot Grid.Row="3" Name="ChartConvolutions" FontFamily="JetBrains Mono" />
-                <WpfPlot Grid.Row="0" Grid.RowSpan="3" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
+                <WpfPlot Grid.Row="0" Grid.RowSpan="4" Name="ChartResearch" FontFamily="JetBrains Mono" Visibility="Collapsed" />
             </Grid>
         </GroupBox>
 
@@ -74,7 +74,7 @@
                                 Click="OnClickButtonClearBits" />
                     </Grid>
                     <Label>Восстановленная последовательность:</Label>
-                    <TextBox Name="TbRestoredBitsSequence" Height="43"
+                    <TextBox Name="TbDecodeBitsSequence" Height="43"
                              TextAlignment="Left" FontSize="18" FontWeight="Bold"
                              HorizontalScrollBarVisibility="Visible" IsReadOnly="True" />
                 </StackPanel>
@@ -127,11 +127,11 @@
                         <Label>Диапазон шума, дБ</Label>
                         <xctk:IntegerUpDown Name="NudSnrFrom" TextAlignment="Right" Width="45" Height="25" Minimum="-50" Maximum="0" Increment="1" Value="-20" />
                         <Label>:</Label>
-                        <xctk:IntegerUpDown Name="NudSnrTo" TextAlignment="Right" Width="45" Height="25" Minimum="1" Maximum="50" Increment="1" Value="10" />
+                        <xctk:IntegerUpDown Name="NudSnrTo" TextAlignment="Right" Width="45" Height="25" Minimum="0" Maximum="50" Increment="1" Value="0" />
                     </WrapPanel>
                     <WrapPanel HorizontalAlignment="Right" Margin="0 5 0 0">
                         <Label>Шаг изменения шума, дБ</Label>
-                        <xctk:DoubleUpDown Name="NudSnrStep" TextAlignment="Right" Width="75" Height="25" Minimum="0.1" Maximum="2.0" Increment="0.1" Value="0.5" FormatString="F1" />
+                        <xctk:DoubleUpDown Name="NudSnrStep" TextAlignment="Right" Width="75" Height="25" Minimum="0.1" Maximum="2.0" Increment="0.1" Value="1" FormatString="F1" />
                     </WrapPanel>
                     <Button Name="ButtonConductResearch" Height="25" Margin="0 5 0 0" Click="OnClickButtonConductResearch">Исследовать</Button>
                     <ProgressBar Name="ProgressResearch"

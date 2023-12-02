@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 
 namespace gold_codes;
 
@@ -11,13 +12,15 @@ public class SignalGenerator
     /// <summary>
     /// Битовая последовательность.
     /// </summary>
-    private List<int> bitsSequence { get; }
+    public List<int> Bits { get; }
+    
+    public List<int> ModulatedBits { get; }
 
     /// <summary>
     /// Длина битовой последовательности.
     /// </summary>
-    public int Nb => bitsSequence.Count;
-
+    public int Nb => ModulatedBits.Count;
+    
     /// <summary>
     /// Битрейт.
     /// </summary>
@@ -54,16 +57,6 @@ public class SignalGenerator
     public double dt => 1d / fd;
 
     /// <summary>
-    /// Число отсчётов в дискретном сигнала.
-    /// </summary>
-    private int countNumbers => (int)(Nb * tb / dt);
-
-    /// <summary>
-    /// Словарь кодов Голда.
-    /// </summary>
-    private Dictionary<string, int[]> _goldSequences;
-
-    /// <summary>
     /// I-компонента сигнала.
     /// </summary>
     public List<PointD> IComponent;
@@ -93,9 +86,9 @@ public class SignalGenerator
         f0 = (double)@params["f0"];
         phi0 = (double)@params["phi0"];
 
-        // Конвертация битовой последовательности в последовательность Голда.
-        bitsSequence = new List<int>();
-        ConvertToGoldSequence((List<int>)@params["bitsSequence"]);
+        Bits = new List<int>();
+        ((List<int>)@params["bitsSequence"]).ForEach(b => Bits.Add(b));
+        ModulatedBits = new List<int>();
 
         IComponent = new List<PointD>();
         QComponent = new List<PointD>();
@@ -154,16 +147,11 @@ public class SignalGenerator
         return mSeq.ToArray();
     }
 
-    /// <summary>
-    /// Конвертация последователности в последовательноть Голда.
-    /// </summary>
-    /// <param name="bits"></param>
-    /// <returns></returns>
-    public void ConvertToGoldSequence(List<int> bits)
+    public static Dictionary<string, int[]> GetGoldCodes()
     {
         var m1 = GenerateMSequence(new[] { 1, 0, 0, 0, 0, 1 });
         var m2 = GenerateMSequence(new[] { 1, 1, 0, 0, 1, 1 });
-        _goldSequences = new Dictionary<string, int[]>
+        var goldCodes = new Dictionary<string, int[]>
         {
             ["00"] = GetGoldCode(m1, ShiftedArray(m2, 0)),
             ["10"] = GetGoldCode(m1, ShiftedArray(m2, 10)),
@@ -171,8 +159,18 @@ public class SignalGenerator
             ["11"] = GetGoldCode(m1, ShiftedArray(m2, 30))
         };
 
-        for (var i = 0; i < (bits.Count % 2 == 0 ? bits.Count : bits.Count - 1); i += 2)
-            bitsSequence.AddRange(_goldSequences[$"{bits[i]}{bits[i + 1]}"]);
+        return goldCodes;
+    }
+
+    /// <summary>
+    /// Конвертация последователности в последовательноть Голда.
+    /// </summary>
+    /// <param name="goldSequences"></param>
+    /// <returns></returns>
+    public void ConvertToGoldSequence(Dictionary<string, int[]> goldSequences)
+    {
+        for (var i = 0; i < (Bits.Count % 2 == 0 ? Bits.Count : Bits.Count - 1); i += 2)
+            ModulatedBits.AddRange(goldSequences[$"{Bits[i]}{Bits[i + 1]}"]);
     }
 
     /// <summary>
@@ -183,8 +181,8 @@ public class SignalGenerator
         var idx = 0;
         for (var i = 0; i < (Nb % 2 == 0 ? Nb : Nb - 1); i += 2)
         {
-            var bi1 = bitsSequence[i] - 0.5;
-            var bi2 = bitsSequence[i + 1] - 0.5;
+            var bi1 = ModulatedBits[i] - 0.5;
+            var bi2 = ModulatedBits[i + 1] - 0.5;
             for (var n = 0; n < 2 * (tb / dt); n++)
             {
                 var ti = idx++ * dt;
@@ -198,12 +196,11 @@ public class SignalGenerator
     /// <summary>
     /// Получение свёрток 
     /// </summary>
-    /// <param name="maxIndexes"></param>
-    public void CalculatedConvolution(out Dictionary<string, int> maxIndexes)
+    /// <param name="goldCodes"></param>
+    public void CalculatedConvolution(Dictionary<string, int[]> goldCodes)
     {
-        var indexes = new Dictionary<string, int>();
         var idx = 0;
-        foreach (var pair in _goldSequences)
+        foreach (var pair in goldCodes)
         {
             var filter = new List<PointD>();
             for (var i = 0; i < pair.Value.Length - 1; i++)
@@ -217,53 +214,47 @@ public class SignalGenerator
                     filter.Add(new PointD(ti, temp));
                 }
             }
-            Convolutions[pair.Key] = GetCrossCorrelation(filter, out var maxIndex);
-            indexes[pair.Key] = maxIndex;
+
+            Convolutions[pair.Key] = GetCrossCorrelation(filter);
         }
-        maxIndexes = indexes;
     }
 
     /// <summary>
     /// Взаимная корреляция комплексной огибающей с фильтром.
     /// </summary>
     /// <param name="filter"></param>
-    /// <param name="maxIndex">Индекс максимального значения</param>
     /// <returns></returns>
-    private List<PointD> GetCrossCorrelation(List<PointD> filter, out int maxIndex)
+    private List<PointD> GetCrossCorrelation(List<PointD> filter)
     {
         var crossCorrelation = new List<PointD>();
-        var maxCorr = double.MinValue;
-        var index = 0;
         for (var i = 0; i < ComplexEnvelope.Count - filter.Count + 1; i++)
         {
             var corr = 0d;
             for (var j = 0; j < filter.Count; j++)
                 corr += ComplexEnvelope[i + j].Y * filter[j].Y;
             crossCorrelation.Add(new PointD(ComplexEnvelope[i].X, corr / filter.Count));
-
-            if (crossCorrelation[i].Y > maxCorr)
-            {
-                maxCorr = crossCorrelation[i].Y;
-                index = i;
-            }
         }
 
-        maxIndex = index;
         return crossCorrelation;
     }
 
-    public List<string> DecodeSignal()
+    /// <summary>
+    /// Получение декодированного сигнала.
+    /// </summary>
+    /// <param name="ber">Коэф. ошибок передачи (bit error rate)</param>
+    /// <returns></returns>
+    public IEnumerable<int> DecodeSignal(out double ber)
     {
         var lengthConvolution = Convolutions["00"].Count;
         var countBitsFilter = Nb / 63 - 1;
         var interval = (int)(tb / dt * 62);
         var startEnd = (lengthConvolution - interval * (countBitsFilter - 1) - 1) / 2;
-    
-        var result = new List<string>();
+
+        var result = new List<int>();
         for (var i = 0; i < lengthConvolution - 1;)
         {
             var range = (i == 0 || i == lengthConvolution - startEnd - 1) ? startEnd : interval;
-    
+
             var maxValue = double.MinValue;
             var maxKey = string.Empty;
             foreach (var pair in Convolutions)
@@ -275,10 +266,16 @@ public class SignalGenerator
                     maxKey = pair.Key;
                 }
             }
-            result.Add(maxKey);
+
+            maxKey.ToList().ForEach(c => result.Add(c == '1' ? 1 : 0));
             i += (i == 0 || i == lengthConvolution - startEnd - 1) ? startEnd : interval;
         }
-    
+
+        ber = 0;
+        for (var i = 0; i < Bits.Count; i++)
+            ber += Bits[i] != result[i] ? 1 : 0;
+        ber /= Bits.Count;
+
         return result;
     }
 

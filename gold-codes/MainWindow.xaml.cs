@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Documents;
 using ScottPlot;
 using ScottPlot.Control;
 
@@ -13,16 +14,20 @@ namespace gold_codes
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
         private readonly BackgroundWorker _bgGenerateSignal, _bgResearch;
         private SignalGenerator _signalGenerator;
         private Dictionary<string, object> _params1, _params2;
-        private Dictionary<string, int> _maxIndexes;
+        private Dictionary<string, int[]> _goldCodes;
+        private List<PointD> _berOnSnr;
+        private bool _isNoise;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            _goldCodes = SignalGenerator.GetGoldCodes();
 
             _bgGenerateSignal = (BackgroundWorker)FindResource("BackgroundWorkerGenerateSignal");
             _bgResearch = (BackgroundWorker)FindResource("BackgroundWorkerConductResearch");
@@ -35,7 +40,7 @@ namespace gold_codes
             SetUpChart(ChartQComponent, "Q-компонента сигнала", "Время, с", "Амплитуда");
             SetUpChart(ChartComplexEnvelope, "Комплексная огибающая", "Время, с", "Амплитуда");
             SetUpChart(ChartConvolutions, "Свёртки согласованнных фильтров", "Время, с", "Амплитуда");
-            // SetUpChart(ChartResearch, "Зависимость вероятности обнаружения сигнала от ОСШ", "Уровень шума, дБ", "Вероятность обнаружения");
+            SetUpChart(ChartResearch, "Зависимость частоты возникновения ошибки от ОСШ", "Уровень шума, дБ", "Частота возникновения ошибки");
 
             OnClickButtonGenerateBitsSequence(null, null);
             OnGenerateSignal(null, null);
@@ -55,7 +60,6 @@ namespace gold_codes
                 ["f0"] = NudF0.Value ?? 1000,
                 ["phi0"] = NudPhi0.Value ?? 0,
                 ["fd"] = NudFd.Value ?? 1,
-                ["isNoise"] = CbIsNoise.IsChecked ?? false,
                 ["SNR"] = NudSnr.Value ?? 5
             };
 
@@ -64,7 +68,9 @@ namespace gold_codes
             TbBitsSequence.Text.Replace(" ", "").ToList().ForEach(b => bitsSequence.Add(b == '1' ? 1 : 0));
             _params1["bitsSequence"] = bitsSequence;
 
+            TbDecodeBitsSequence.Clear();
             ButtonGenerateSignal.IsEnabled = false;
+
             _bgGenerateSignal.RunWorkerAsync();
         }
 
@@ -73,12 +79,11 @@ namespace gold_codes
             try
             {
                 _signalGenerator = new SignalGenerator(_params1);
+                _signalGenerator.ConvertToGoldSequence(_goldCodes);
                 _signalGenerator.CalculatedIQComponents();
-                // Наложение шума.
-                if ((bool)_params1["isNoise"])
+                if (_isNoise) // Наложение шума.
                     _signalGenerator.MakeNoise((double)_params1["SNR"]);
-                _signalGenerator.CalculatedConvolution(out _maxIndexes);
-
+                _signalGenerator.CalculatedConvolution(_goldCodes);
             }
             catch (Exception exception)
             {
@@ -91,14 +96,14 @@ namespace gold_codes
             ButtonGenerateSignal.IsEnabled = true;
 
             // Получение декодированной последовательности.
-            TbRestoredBitsSequence.Text = string.Join("", _signalGenerator.DecodeSignal());
-            
+            TbDecodeBitsSequence.Text = string.Join("", _signalGenerator.DecodeSignal(out _));
+
             ChartIComponent.Visibility = Visibility.Visible;
             ChartQComponent.Visibility = Visibility.Visible;
             ChartComplexEnvelope.Visibility = Visibility.Visible;
             ChartConvolutions.Visibility = Visibility.Visible;
             ChartResearch.Visibility = Visibility.Collapsed;
-            
+
             // Очистка графиков.
             ChartIComponent.Plot.Clear();
             ChartQComponent.Plot.Clear();
@@ -148,7 +153,7 @@ namespace gold_codes
                     pair.Value.Select(p => p.Y).ToArray(),
                     label: pair.Key
                 );
-                maxValues.Add(pair.Value[_maxIndexes[pair.Key]].Y);
+                maxValues.Add(pair.Value.Max(p => p.Y));
             }
 
             yMax = maxValues.Max() * 1.5;
@@ -165,7 +170,8 @@ namespace gold_codes
         {
             ButtonConductResearch.Visibility = Visibility.Collapsed;
             ProgressResearch.Visibility = Visibility.Visible;
-            
+
+            _berOnSnr = new List<PointD>();
             _params2 = new Dictionary<string, object>
             {
                 ["bps"] = NudBps.Value ?? 10,
@@ -178,14 +184,15 @@ namespace gold_codes
                 ["snrTo"] = NudSnrTo.Value ?? 10,
                 ["snrStep"] = NudSnrStep.Value ?? 0.5,
             };
-            
+
             // Получение битовой последовательности.
             var bitsSequence = new List<int>();
             TbBitsSequence.Text.Replace(" ", "").ToList().ForEach(b => bitsSequence.Add(b == '1' ? 1 : 0));
-            _params1["bitsSequence"] = bitsSequence;
-            
+            _params2["bitsSequence"] = bitsSequence;
+
             ProgressResearch.Value = 0;
-            
+            ProgressResearch.Maximum = (int)_params2["meanOrder"] * (((int)_params2["snrTo"] - (int)_params2["snrFrom"]) / (double)_params2["snrStep"] + 1);
+
             _bgResearch.RunWorkerAsync();
         }
 
@@ -193,7 +200,32 @@ namespace gold_codes
         {
             try
             {
-                
+                var meanOrder = (int)_params2["meanOrder"];
+                var snrFrom = (int)_params2["snrFrom"];
+                var snrTo = (int)_params2["snrTo"];
+                var snrStep = (double)_params2["snrStep"];
+                var index = 0;
+
+                Parallel.For(0, (int)((snrTo - snrFrom) / snrStep + 2), n =>
+                {
+                    var snr = snrFrom + n * snrStep;
+                    var bers = 0d;
+                    Parallel.For(0, meanOrder, i =>
+                    {
+                        var sg = new SignalGenerator(_params1);
+                        sg.ConvertToGoldSequence(_goldCodes);
+                        sg.CalculatedIQComponents();
+                        sg.MakeNoise(snr);
+                        sg.CalculatedConvolution(_goldCodes);
+                        _ = sg.DecodeSignal(out var ber);
+                        bers += ber;
+
+                        // Обновление ProgressBar.
+                        _bgResearch.ReportProgress(++index);
+                    });
+                    _berOnSnr.Add(new PointD(snr, bers / meanOrder));
+                });
+                _berOnSnr = _berOnSnr.OrderBy(p => p.X).ToList();
             }
             catch (Exception exception)
             {
@@ -201,21 +233,33 @@ namespace gold_codes
             }
         }
 
-        private void OnRunWorkerCompletedBackgroundWorkerConductResearch(object sender, RunWorkerCompletedEventArgs e) { }
-
-        private void OnProgressChangedBackgroundWorkerConductResearch(object sender, ProgressChangedEventArgs e)
+        private void OnRunWorkerCompletedBackgroundWorkerConductResearch(object sender, RunWorkerCompletedEventArgs e)
         {
             ChartIComponent.Visibility = Visibility.Collapsed;
             ChartQComponent.Visibility = Visibility.Collapsed;
             ChartComplexEnvelope.Visibility = Visibility.Collapsed;
             ChartConvolutions.Visibility = Visibility.Collapsed;
             ChartResearch.Visibility = Visibility.Visible;
-            
-            // Отрисовка графика ... . 
+
+            // Отрисовка графика зависимости BER от SNR. 
             ChartResearch.Plot.Clear();
-            
+            ChartResearch.Plot.AddSignalXY(
+                _berOnSnr.Select(p => p.X).ToArray(),
+                _berOnSnr.Select(p => p.Y).ToArray(),
+                Color.Blue,
+                "BER(SNR)"
+            );
+            ChartResearch.Plot.Legend();
+            ChartResearch.Plot.SetAxisLimits(xMin: (int)_params2["snrFrom"], xMax: (int)_params2["snrTo"], yMin: 0, yMax: 0.5);
+            ChartResearch.Refresh();
+
             ButtonConductResearch.Visibility = Visibility.Visible;
             ProgressResearch.Visibility = Visibility.Collapsed;
+        }
+
+        private void OnProgressChangedBackgroundWorkerConductResearch(object sender, ProgressChangedEventArgs e)
+        {
+            ProgressResearch.Value = e.ProgressPercentage;
         }
 
         #endregion
@@ -246,8 +290,7 @@ namespace gold_codes
             var bits = SignalGenerator.GenerateBitsSequence(length);
 
             TbBitsSequence.Clear();
-            for (var i = 0; i < bits.Length; i++)
-                TbBitsSequence.Text += bits[i];
+            TbBitsSequence.Text = bits;
 
             ButtonGenerateSignal.IsEnabled = true;
             OnGenerateSignal(null, null);
@@ -260,6 +303,7 @@ namespace gold_codes
         private void OnCheckedCheckBoxIsNoise(object sender, RoutedEventArgs e)
         {
             NudSnr.IsEnabled = CbIsNoise.IsChecked ?? false;
+            _isNoise = CbIsNoise.IsChecked ?? false;
             OnGenerateSignal(null, null);
         }
 
